@@ -12,9 +12,9 @@ Your task is to take the data that was prepared by Arjun Patel in the CFO's Offi
 
 ## Deliverables
 ### Tables
-1. Quarterly revenue per year
-2. Average monthly revenue, expenses, and profit/loss across years
-3. Percentage Change in revenue, expenses, and profit/loss month-to-month
+* Quarterly revenue per year
+* Average monthly revenue, expenses, and profit/loss across years
+* Percentage Change in revenue, expenses, and profit/loss month-to-month
 
 ### Forecasting
 Short-term forecast for revenue and expenses using a weighted moving average (WMA) model
