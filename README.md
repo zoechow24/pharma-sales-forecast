@@ -43,13 +43,13 @@ Short-term forecast for revenue and expenses using a weighted moving average (WM
 ## Methodology
 
 1. **Load data** from [dataset](https://s3.us-east-2.amazonaws.com/artificium.us/datasets/pharma-sales-randomized.tsv)  
-1. **Prepare and shape data**  
-  - Format and clean values  
-  - Handle missing and outlier data  
-  - Calculate profit and losses  
-1. **Aggregate data** into quarterly and monthly summary tables  
-1. **Forecast** revenue and expenses using a weighted moving average (0.6, 0.3, 0.1)  
-1. **Visualize** profit & loss trends with forecasting overlay, formatted for presentation use  
+2. **Prepare and shape data**  
+   - Format data  
+   - Handle missing/outlier data  
+   - Calculate profit and losses  
+3. **Aggregate data** into quarterly and monthly tables  
+4. **Forecast** revenue and expenses with a weighted moving average (0.6, 0.3, 0.1)  
+5. **Visualize** profit & loss trends with forecasting overlay, formatted for presentation use  
 
 
 ## Results
