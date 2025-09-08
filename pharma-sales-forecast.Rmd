@@ -1,5 +1,5 @@
 ---
-title: "Data Analytics & Visualization"
+title: "Pharma Sales Analytics and Forecast"
 author: "Zoe Chow"
 date: "Spring 2025"
 output:
