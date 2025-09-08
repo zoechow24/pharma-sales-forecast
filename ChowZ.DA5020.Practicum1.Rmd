@@ -1,0 +1,342 @@
+---
+title: "Data Analytics & Visualization"
+author: "Zoe Chow"
+date: "Spring 2025"
+output:
+  html_document:
+    df_print: kable
+subtitle: DA5020 / Practicum 1
+---
+
+## Part A | Loading Data
+I set a chunk to store all the packages I load for organization. I am also used to having all packages be at the top from my Python class.
+```{r PackageLoads, echo=T}
+suppressPackageStartupMessages(library(lubridate))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(kableExtra))
+suppressPackageStartupMessages(library(tibble))
+suppressPackageStartupMessages(library(ggplot2))
+```
+
+The data is a tsv file, therefore, it should be tab delimited.
+```{r PartA, echo=T}
+url <- "https://s3.us-east-2.amazonaws.com/artificium.us/datasets/pharma-sales-randomized.tsv"
+
+df <- read.table(url, sep="\t", header=T)
+```
+
+
+## Part B | Preparing and Shaping the Data
+
+### Formatting Data
+I wanted to first remove "$" from revenue and expenses to more easily convert the values into numerics. Since the values are also supposed to be in thousands, I multiplied the values by 1000 after converting them to numerics. I did this in the beginning because I felt that it would make future calculations and manipulations simpler. 
+```{r PartB_Format, echo=T}
+# removing "$" from revenue and expenses and converting to 1000s
+formatRnE <- function(data){
+  removed <- gsub("\\$", "", data)
+  formatted <- suppressWarnings(as.numeric(removed)) * 1000
+  return(formatted)
+}
+df$revenue <- formatRnE(df$revenue)
+df$expenses <- formatRnE(df$expenses)
+```
+
+### Outliers and Missing Data
+To handle outliers and missing data, I decided to imputate instead of removing data because I would need the prior 3 months to calculate the WMA later. Removal of any data would impact the forecast. 
+
+In order to to so, I created a function that first calculates the mean and standard deviation of the data without the missing values. The mean and standard deviation would then be used to calculate the z-score using the function $\frac{|(data - \mu_{data})|}{\sigma_{data}}$. The function stores the z-score in a vector, and determines which value in the vector is greater than 2.5 standard deviations away from the mean - the outliers. In order to handle outliers, the function replaces the data in the vector with the mean of the data with outliers removed. The function lastly replaces missing data with the mean of the data after the outliers are imputated. I chose to handle the outliers and missing data with different means to give more variety to the data. I felt that using the mean of the data after the outliers were imputated would give variety without being over 2.5 standard deviations from the mean. I used this function to handle outliers and missing values of revenue and expensses.
+```{r PartB_OutliersnMissing, echo=T}
+# don't want to remove any data bc we want SOMETHING for each month for determining WMA later)
+
+
+outliers_n_missing <- function(data){
+  dataMean <- mean(data, na.rm=T) # determine mean without missing data
+  dataSd <- sd(data, na.rm=T) # determine sd without missing data
+  z.data <- abs((data-dataMean) / dataSd) # determine z-score
+  
+  # determine which rows contain outliers
+  rows.outliers <- which(z.data > 2.5) 
+  
+  # handle outliers
+  if (length(rows.outliers) > 0){
+    mean_wo_out <- mean(data[-rows.outliers], na.rm = TRUE)
+    data[rows.outliers] <- mean_wo_out
+  }
+  
+  # handle missing with mean
+  data[is.na(data)] <- mean(data, na.rm=T) 
+  
+  return(round(data, 2))
+}
+
+df$revenue <- outliers_n_missing(df$revenue)
+df$expenses <- outliers_n_missing(df$expenses)
+
+
+
+```
+
+### Dates
+I used the lubridate package manipulate the dates data. I first converted the characters of df\$date to Dates, which allowed me to extract month, day, and year for additional columns. I also arranged the data frame according to descending dates for easier visualization and future calculations. 
+
+```{r PartB_Dates, echo=T}
+# 3. Format Date & split date into 3 new columns
+# format the dates column to be more uniform and the chart does not include the day
+df$date <- mdy(df$date)
+
+
+df$month <- format(df$date, "%b")
+df$day <- format(df$date, "%d")
+df$year <- format(df$date, "%Y")
+
+# sort for better visualization and future manipulation
+df <- df %>%
+  arrange(desc(date))
+```
+
+### Profit and Losses
+I created a new column with profit and losses called ProfitLoss by subtracting expenses from revenue. 
+```{r PartB_ProfitLoss, echo=T}
+# 4. ProfitLoss
+df$ProfitLoss <- round((df$revenue - df$expenses), 2)
+```
+
+
+## Part C | Aggregating Data in Tables
+### Quarterly Revenue per Year
+To create a table of quarterly revenue per year, I grouped the data frame to years so that I could calculate the sum of revenue for each quarter without worrying about overlapping the years. To find the quarterly revenue, I originally separated each quarter by hard-coding the months, as I felt that the quarters in a year is universal. However, after re-reading the instructions, I saw that it was not the appropriate method.
+
+Therefore, I attempted a different approach where I created a data frame where I had a column where I sorted which month belongs to which quarter and added up the revenue of each quarter for that year. Then, I used that data frame to create another, in which I added the revenues that share the same quarter. With this method, I did not need to hard-code the months, but it was more complicated as I had to use manipulate the data in two steps as opposed to one. 
+
+I further experimented with kableExtra to turn the data frame into a html table. I personally preferred how the minimal dark theme looked and made sure to use the stripped option to more clearly discern between each line of data. I changed the color of the header to allow for more distinction. 
+```{r QuaterlyRevPerYear, echo=T}
+# create a new df that sorts which month belongs to which quarter and adds up the revenue of each quarter for that year
+quarters <- df %>%
+  mutate(
+    month_num = match(month, month.abb),  # Convert month names to numbers
+    quarter = case_when(
+      month_num %in% 1:3  ~ "Q1",
+      month_num %in% 4:6  ~ "Q2",
+      month_num %in% 7:9  ~ "Q3",
+      month_num %in% 10:12 ~ "Q4"
+    )
+  ) %>%
+  group_by(year, quarter) %>%
+  summarize(revenue = sum(revenue, na.rm = TRUE), .groups = "drop")
+
+# create a new df with the sums the quarters for all years
+quarterly_rev <- quarters %>%
+  group_by(year) %>%
+  summarize(
+    "Q1(\\$)" = sum(revenue[quarter == "Q1"]),
+    "Q2(\\$)" = sum(revenue[quarter == "Q2"]),
+    "Q3(\\$)" = sum(revenue[quarter == "Q3"]),
+    "Q4(\\$)" = sum(revenue[quarter == "Q4"])
+  ) %>%
+  arrange(desc(year)) %>%
+  rename(Year = year)
+
+quarterly_rev %>%
+  kbl(format = "html",
+      align = "c", 
+      caption = "Quarterly revenue per year in USD(\\$)",
+      escape = FALSE) %>%
+  kable_material_dark(c("striped", "hover"), position = "center", full_width = F) %>%
+  row_spec(0, background = "grey", color = "white")
+```
+
+
+### Average revenue, expenses, and profit-loss per month across all years
+For the next table, I kept the styling the same. For the content of the table, I created a new data frame where I grouped the months of the original and found the average revenue, expenses, and profit-loss of each month. I then used the factor function to encode the months into levels according to the abbreviated months. I did this to more easily sort the table based on the month. 
+```{r AvgPerMonth, echo=T}
+perMonth <- df %>%
+  group_by(month) %>%
+  summarize("Revenue(\\$)" = round(mean(revenue),2),
+            "Expenses(\\$)" = round(mean(expenses),2),
+            "ProfitLoss(\\$)" = round(mean(ProfitLoss),2)) %>%
+  mutate(month = factor(month, levels = month.abb)) %>%
+  arrange(month) %>%
+  rename(Month = month) %>%
+  ungroup()
+  
+perMonth %>%
+  kbl(format = "html",
+      align = "c", 
+      caption = "Average revenue, expenses, and profit-loss per month across all years in USD(\\$)",
+      escape = FALSE) %>%
+  kable_material_dark(c("striped", "hover"), position = "center", full_width = T) %>%
+  row_spec(0, background = "grey", color = "white")
+
+```
+
+
+### Percent change in revenue, expenses, and profit-loss from the prior month
+To create a table containing the percent change in revenue, expenses, and profit-loss from the prior month, I created a function that sets the first value of the data to 0, as there would not be a percent change for the first month. The function then iterates through the rest of the data and calculates the percent change by using the function $\frac{New-Old}{Old}*100$. I did not use $\frac{|New-Old|}{Old}*100$ because I thought that seeing the magnitude of percent change would be important. With this we would be able to see if the change was an increase or decrease. I applied the function after grouping the table by year and sorting by decreasing year and month. For the table, I chose to display the year, month, and the percent change in revenue, expenses, and profit-loss. I also renamed the column labels accordingly for the table to look better. 
+
+When using kableExtra to change the table to html, I collapsed the year column so that we can see the grouping of the table. For this table, I didn't use the "striped" format because I was unable to do it based on the years. Furthermore, after testing multiple methods, this format displayed the data clearest while using the minimal dark theme. 
+```{r PercentChange, echo=T}
+p.change <- function(data){
+  percent <- numeric(length(data))  
+  percent[1] <- 0 
+  
+  for (i in 2:length(data)) {
+    percent[i] <- (data[i] - data[i-1]) / data[i-1] * 100
+  }
+  
+  return(round(percent, 2))
+}
+
+pchange <- df %>%
+  group_by(year) %>%
+  mutate(month = factor(month, levels = month.abb)) %>%
+  arrange(desc(year), month) %>%  
+  mutate(
+    pc.revenue = p.change(revenue),
+    pc.expenses = p.change(expenses),
+    pc.profitloss = p.change(ProfitLoss)
+  ) %>%
+  select(year, month, pc.revenue, pc.expenses, pc.profitloss) %>%
+  rename(
+    Year = year,
+    Month = month,
+    "% Change in Revenue" = pc.revenue,
+    "% Change in Expenses" = pc.expenses,
+    "% Change in Profit-Loss" = pc.profitloss
+    ) %>%
+  ungroup() 
+
+pchange %>%
+  kbl(align = "c", caption = " Percent change in revenue, expenses, and profit-loss from the prior month") %>%
+  kable_material_dark() %>%
+  row_spec(0, background = "grey", color = "white", bold = T, font_size = "medium") %>%
+  collapse_rows(columns = 1, valign = "middle", latex_hline = "full", row_group_label_position = "identity") %>%
+  kable_styling(c("hover"), position = "center", full_width = F) 
+
+```
+
+## Part D | Making a Forecast
+To forecast revenue, expenses, and profit-loss, I created a function that iterates through the data and multiplies the weighted moving average(0.6, 0.3, and 0.1) with the prior three months in the corresponding order and sums it up. 
+
+Originally, I made it so that the last 3 months would have NA values, as the data does not provide the three prior months for predictive calculations. However, for the last 3 months of the data, I decided to take whatever prior months is left and multiply with the corresponding weighted moving average. Therefore, for the third to last month, it find the sum of 0.6(the second to last month) and 0.3(the last month), and for the second to last month, it will multiply the last month with 0.6. Lastly, for the last month, it will just return the data, as no prediction can be made. 
+
+When reviewing the assignment again, I realized that the client would also like to forecast the next two months of the chart as well. Therefore, I created a new data frame with the next two months, so that I can bind the rows to the forecasted data frame. I also manipulated the function so that it would account for any missing data when prediction the future dates. After successfully binding the data frames, I made sure to sort by descending year and month to see the most recent data at the top. I then used mutate while calling on the function to create 3 new columns containing the forecasted revenue, expenses, and profit-loss. 
+```{r PartD_Forecast, echo = T}
+# function to predict forecast
+forecastfunc <- function(data){
+  prediction <- data
+  
+  for (i in 1:(length(data))) {
+    # for reg (2:length(data)-3)
+    if (i <= length(data) - 3 && !is.na(data[i+3]) && !is.na(data[i+2]) && !is.na(data[i+1])){
+      prediction[i] <- (0.6 * data[i+1]) + (0.3 * data[i+2]) + (0.1 * data[i+3])
+    }
+    # for 3rd to last
+    else if(i == length(data)-2 && !is.na(data[i+1]) && !is.na(data[i+2])){
+      prediction[i] <- (0.6 * data[i+1]) + (0.3 * data[i+2])  
+    }
+    # for 2nd to last
+    else if(i == length(data) - 1 && !is.na(data[i+1])){
+      prediction[i] <- (0.6 * data[i+1]) 
+    }
+    # for 1st
+    else if(!is.na(data[i+1] && is.na(data[i+2]))){
+      prediction[i] <- (0.3 * data[i+2]) + (0.1 * data[i+3])
+    }
+    # for last
+    else{
+      prediction[i] <- data[i]
+    }
+  }
+  return(round(prediction, 2))
+}
+
+# create data frame that contains the next 2 months by taking the most recent date and finding the next two dates
+new_rows <- df %>%
+  mutate(month = factor(month, levels = month.abb)) %>%
+  arrange(desc(year), desc(month))
+
+top_row <- new_rows[1, ]
+
+next_months <- data.frame(
+  date = c(top_row$date %m+% months(1), top_row$date %m+% months(2))
+)
+
+next_months <- next_months %>%
+  mutate(
+    year = format(date, "%Y"),
+    month = format(date,  "%b"),
+    revenue = NA,
+    expenses = NA,
+    ProfitLoss = NA
+)
+
+
+# add two new rows containing the new dates and finding the predicted forecast for revenue, expenses, and profit-loss
+forecast <- df %>%
+  select(date, year, month, revenue, expenses, ProfitLoss) %>%
+  bind_rows(next_months) %>%
+  mutate(month = factor(month, levels = month.abb)) %>%
+  arrange(desc(year), desc(month)) %>%
+  mutate(
+    rev.forecast= forecastfunc(revenue),
+    exp.forecast = forecastfunc(expenses),
+    pftloss.forecast = forecastfunc(ProfitLoss)
+  ) 
+
+
+
+```
+
+## Part E | Building a Visualization
+To build the graph, I used ggplot2. I changed the data frame to a tibble because the ggplot2 help section claimed that tibbles work better with ggplot2. I changed the profit-loss and forecasted profit-loss columns to be in thousands to follow the format of the chart shown in the background. From my research it seemed that ggplot functions through layering. So I first set the plot to be based off of the tibble I created. Then I added a blue line for the actual profit-loss and a red line for the forecasted profit-loss. I then adjusted the x-axis so that it would showcase the abbreviated month and year like the example. I also added the labels for the title, subtitle, and axis-labels through another layer. I added a theme layer to center the title and the subtitle. Lastly, to annotate the lines like the example chart, I used annotate(). I selected a point based on the data frame and adjusted the vjust and hjust parameters so that the annotations are clearly visible. As the source of the data is supposed to be "Internal Accounting Data -- CONFIDENTIAL", I did not include "US Bureau of Economic Analysis", "U.S. International Trade in Goods and Services", and "U.S. Census Bureau" like the example. I originally wanted to use the classic theme and add minor ticks for the chart to look more closely to the example, however, I kept getting errors stating that minor ticks are not apart of the theme. Therefore, I chose the black and white theme for the data to be more clearly observed. 
+```{r PartE_Visual, echo=F, warning = F}
+
+# ggplot system works best in a tidy format
+tibble <- as_tibble(forecast)
+tibble$date <- as.Date(tibble$date)
+
+tibble <- tibble %>%
+  select(date, ProfitLoss, pftloss.forecast) %>%
+  mutate(ProfitLoss = ProfitLoss/1000,
+         pftloss.forecast = pftloss.forecast/1000)
+
+pftl.point <- tibble[17,]
+forecasted.point <- tibble[27,]
+ddate <- format(Sys.Date(), "%B %d, %Y")
+
+ggplot(tibble) +
+  geom_line(aes(date, ProfitLoss), color = "blue") +
+  geom_line(aes(date, pftloss.forecast), color = "red") +
+  scale_x_date(date_labels = "%b %Y") + 
+  labs(title = "Profit & Loss By Month",
+       subtitle = "Trend Over Time",
+       x = "Date",
+       y = "US$ in thousands",
+       color = "Legend",
+       caption = paste("Source: Internal Accounting Data -- CONFIDENTIAL", 
+                       "\n", 
+                       ddate)
+       ) +
+  annotate("text",
+           x = pftl.point$date,
+           y = pftl.point$ProfitLoss,
+           label = "Profit/Loss",
+           color = "blue",
+           vjust = -1,
+           size = 3) +
+  annotate("text",
+           x = forecasted.point$date,
+           y = forecasted.point$pftloss.forecast,
+           label = "Three-month moving average",
+           color = "red",
+           hjust = -0.15,
+           size = 3) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) 
+  
+```
+
