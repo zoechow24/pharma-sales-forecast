@@ -1,4 +1,6 @@
 # Pharmaceutical Sales Forecasting
+## Course
+DA5020 - Collecting, Storing, and Analyzing Data
 
 ## Overview
 This project simulates a real-world scenario where a pharmaceutical company needs to prepare fiscal year-end sales forecasts and presentation materials for senior leadership. The goal was to analyze provided data, generate insights, and create visual assets to support executive-level decision-making. This project follows the CRISP-DM framework, and the final output is a reproducible R Notebook report combining narrative, analysis, and code.
