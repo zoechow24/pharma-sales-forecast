@@ -53,7 +53,7 @@ Short-term forecast for revenue and expenses using a weighted moving average (WM
 
 
 ## Results
-The [final report](https://zoechow24.github.io/pharma-sales-forecast/pharma-sales-report.html) provides executive-ready tables, time-series forecasts, and polished visualizations, offering clear insights into revenue, expenses, and profit/loss trends. It also includes fully reproducible R code, ensuring transparency and repeatability.
+The [final report](https://zoechow24.github.io/pharma-sales-forecast/pharma-sales-forecast.html) provides executive-ready tables, time-series forecasts, and polished visualizations, offering clear insights into revenue, expenses, and profit/loss trends. It also includes fully reproducible R code, ensuring transparency and repeatability.
 
 
    
