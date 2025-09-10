@@ -34,7 +34,7 @@ Short-term forecast for revenue and expenses using a weighted moving average (WM
 * R
 * RStudio
 
-## Dependencies
+### Dependencies:
 This project uses the following packages:
 * lubridate
 * dplyr
@@ -51,7 +51,6 @@ This project uses the following packages:
 * Data visualization
 
 ## Methodology
-
 1. **Load data** from [dataset](https://s3.us-east-2.amazonaws.com/artificium.us/datasets/pharma-sales-randomized.tsv)  
 2. **Prepare and shape data**  
    - Format data  
