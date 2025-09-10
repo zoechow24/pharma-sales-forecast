@@ -34,6 +34,15 @@ Short-term forecast for revenue and expenses using a weighted moving average (WM
 * R
 * RStudio
 
+## Dependencies
+This project uses the following packages:
+* lubridate
+* dplyr
+* knitr
+* kableExtra
+* tibble
+* ggplot2
+
 ### Techniques:
 * Data wrangling and cleaning
 * Handling missing values and outliers
